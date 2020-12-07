@@ -16,9 +16,11 @@ class ClassificationNetwork(nn.Module):
         super().__init__()
 
         self.fc1 = nn.Linear(hidden_size, 1)
+        self.sig = nn.Sigmoid()
 
     def forward(self, h_t):
 
-        rough_pred = nn.Sigmoid(self.fc1())
+        print("FORWARD: {}".format(h_t.shape))
+        rough_pred = self.sig(self.fc1(h_t))
 
         return rough_pred

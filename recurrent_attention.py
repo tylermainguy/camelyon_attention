@@ -15,28 +15,30 @@ class RecurrentAttentionModel(nn.Module):
     feature extraction from glimpses.
     """
 
-    def __init__(self, glimpse_size, location_hidden, output_size, hidden_size, input_size):
+    def __init__(self, glimpse_size, location_hidden_size, glimpse_feature_size, hidden_state_size, location_output_size):
         super().__init__()
 
         self.glimpse_net = GlimpseNetwork(
-            glimpse_size, location_hidden, output_size)
+            glimpse_size, location_hidden_size, glimpse_feature_size)
 
-        self.core_net = CoreNetwork(input_size, hidden_size, output_size)
+        self.core_net = CoreNetwork(
+            glimpse_feature_size, hidden_state_size, location_output_size)
 
-        self.classification_net = ClassificationNetwork(hidden_size)
+        self.classification_net = ClassificationNetwork(hidden_state_size)
         # params here
 
-    def forward(self, image, location, h_t_prev, is_pred=False):
+    def forward(self, image, location, h_t_prev, cell_state, is_pred=False):
         """
         Forward pass, combining these units together.
         """
 
         g_t = self.glimpse_net(image, location)
 
-        h_t, l_t = self.core_net(h_t_prev, g_t)
+        (h_t, cell_state, l_t) = self.core_net(h_t_prev, cell_state, g_t)
 
         # only want to produce classification on last iteration
         if is_pred:
             prediction = self.classification_net(h_t)
+            return h_t, cell_state, l_t, prediction
 
-        return h_t, l_t
+        return h_t, cell_state, l_t

@@ -11,7 +11,7 @@ class CoreNetwork(nn.Module):
     to decide the next area to glimpse.
     """
 
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, glimpse_feature_size, hidden_state_size, location_output_size):
         """
         hidden size is the size of the hidden state in the recurrent unit.
         input size is the size of the sequence data (in this case, the
@@ -19,25 +19,31 @@ class CoreNetwork(nn.Module):
         """
 
         super().__init__()
-        self.hidden_size = hidden_size
-        self.input_size = input_size
+        self.hidden_size = hidden_state_size
+        self.input_size = glimpse_feature_size
 
         # lstm network
-        self.lstm = nn.LSTM(input_size, hidden_size)
+        self.lstm = nn.LSTM(glimpse_feature_size, hidden_state_size)
 
         # fully connected layer to predict the next location
-        self.location_fc = nn.Linear(hidden_size, output_size)
+        self.location_fc = nn.Linear(hidden_state_size, location_output_size)
 
-    def forward(self, h_t_prev, glimpse_feature):
+    def forward(self, h_t_prev, cell_state, glimpse_feature):
         """
         forward pass of the recurrent unit. output is the updated hidden
         state of the hidden unit
         """
+        # need to add number of timesteps per input (only one timestep)
+        glimpse_feature = glimpse_feature.unsqueeze(0)
 
         # pass in new feature and previous hidden state into LSTM
-        h_t = self.lstm(glimpse_feature, h_t_prev)
+        lstm_out, (h_t, cell_state) = self.lstm(
+            glimpse_feature, (h_t_prev, cell_state))
 
         # get next location vector
-        l_t = self.location(h_t)
+        l_t = self.location_fc(lstm_out)
 
-        return h_t, l_t
+        l_t = torch.squeeze(l_t, 0)
+        l_t = torch.transpose(l_t, 0, 1)
+        print(l_t.shape)
+        return h_t, cell_state, l_t

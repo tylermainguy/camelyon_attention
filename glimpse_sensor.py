@@ -11,7 +11,6 @@ class GlimpseSensor:
         super().__init__()
 
         self.glimpse_size = glimpse_size
-        self.glimpse_factor = glimpse_factor
 
     def glimpse(self, image, location):
         """
@@ -23,8 +22,9 @@ class GlimpseSensor:
 
         location = self.convert_location(location, image.shape[2])
 
-        x = location[0].numpy().astype("int")[0]
-        y = location[1].numpy().astype("int")[0]
+        print(location)
+        x = location[0].int()
+        y = location[1].int()
 
         patch = image[:, :, x - dist: x + dist,
                       y - dist: y + dist]

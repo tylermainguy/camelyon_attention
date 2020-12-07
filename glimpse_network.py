@@ -15,26 +15,27 @@ class GlimpseNetwork(nn.Module):
     to be used to updated the hidden state.
     """
 
-    def __init__(self, glimpse_size, location_hidden, output_size):
+    def __init__(self, glimpse_size, location_hidden_size, glimpse_feature_size):
         super().__init__()
 
         self.glimpse_size = glimpse_size
-        self.location_hidden = location_hidden
+        self.location_hidden_size = location_hidden_size
 
         self.sensor = GlimpseSensor(glimpse_size)
 
         # input to the location network is always size 2
-        self.location_fc1 = nn.Linear(2, location_hidden)
+        self.location_fc1 = nn.Linear(2, location_hidden_size)
 
-        self.inception = get_pretrained_inception(output_size)
+        self.inception = get_pretrained_inception(glimpse_feature_size)
 
-        self.location_fc2 = nn.Linear(location_hidden, output_size)
+        self.location_fc2 = nn.Linear(
+            location_hidden_size, glimpse_feature_size)
 
     def forward(self, image, location):
 
         glimpse = self.sensor.glimpse(image, location)
 
-        l_hidden = F.relu(self.location_fc1(location))
+        l_hidden = F.relu(self.location_fc1(location.transpose(0, 1)))
         l_out = self.location_fc2(l_hidden)
 
         # this should be replaced with CNN code

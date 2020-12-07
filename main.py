@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 
 from glimpse_sensor import GlimpseSensor
 from inception_pretrained import get_pretrained_inception
+from train_network import train
 
 
 def main():
@@ -15,14 +16,16 @@ def main():
                              0.229, 0.224, 0.225])
     ])
 
-    # dataset = datasets.ImageFolder("data/train/downsampled", transform=transf)
+    dataset = datasets.ImageFolder("data/train/downsampled", transform=transf)
 
-    # train_loader = torch.utils.data.DataLoader(
-    #     dataset=dataset,
-    #     batch_size=1,
-    #     shuffle=True
-    # )
+    batch_size = 1
+    train_loader = torch.utils.data.DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=True
+    )
 
+    train(train_loader, batch_size)
     # iter_loader = iter(train_loader)
 
     # x, y = next(iter_loader)
@@ -38,8 +41,6 @@ def main():
 
     # plt.imshow(sq)
     # plt.show()
-
-    get_pretrained_inception()
 
 
 if __name__ == "__main__":
