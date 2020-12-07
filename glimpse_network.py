@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from glimpse_sensor import GlimpseSensor
+from inception_pretrained import get_pretrained_inception
 
 
 class GlimpseNetwork(nn.Module):
@@ -20,29 +21,26 @@ class GlimpseNetwork(nn.Module):
         self.glimpse_size = glimpse_size
         self.location_hidden = location_hidden
 
+        self.sensor = GlimpseSensor(glimpse_size)
+
         # input to the location network is always size 2
         self.location_fc1 = nn.Linear(2, location_hidden)
 
-        # size of this will be based on the output of the inception network
-        # (or whatever other CNN network) convolutional layers look like
+        self.inception = get_pretrained_inception(output_size)
 
         self.location_fc2 = nn.Linear(location_hidden, output_size)
-        # TODO add CNN layers here
 
     def forward(self, image, location):
 
-        sensor = GlimpseSensor(self.glimpse_size)
-
-        glimpse = sensor.glimpse(image, location)
+        glimpse = self.sensor.glimpse(image, location)
 
         l_hidden = F.relu(self.location_fc1(location))
         l_out = self.location_fc2(l_hidden)
 
         # this should be replaced with CNN code
-        glimpse_hidden = 0
-
-        # replaced with fully connected layer
-        glimpse_out = 0
+        glimpse_out = self.inception(glimpse)
 
         # TODO combine the output of the location and conv. layers
         glimpse_feature = F.relu(l_out + glimpse_out)
+
+        return glimpse_feature
