@@ -20,7 +20,8 @@ class ClassificationNetwork(nn.Module):
 
     def forward(self, h_t):
 
-        print("FORWARD: {}".format(h_t.shape))
         rough_pred = self.sig(self.fc1(h_t))
+        # TODO CAREFUL HERE - not sure if doing this changes anything
+        rough_pred = torch.squeeze(rough_pred, 0)
 
         return rough_pred

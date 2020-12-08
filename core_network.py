@@ -25,9 +25,6 @@ class CoreNetwork(nn.Module):
         # lstm network
         self.lstm = nn.LSTM(glimpse_feature_size, hidden_state_size)
 
-        # fully connected layer to predict the next location
-        self.location_fc = nn.Linear(hidden_state_size, location_output_size)
-
     def forward(self, h_t_prev, cell_state, glimpse_feature):
         """
         forward pass of the recurrent unit. output is the updated hidden
@@ -40,10 +37,4 @@ class CoreNetwork(nn.Module):
         lstm_out, (h_t, cell_state) = self.lstm(
             glimpse_feature, (h_t_prev, cell_state))
 
-        # get next location vector
-        l_t = self.location_fc(lstm_out)
-
-        l_t = torch.squeeze(l_t, 0)
-        l_t = torch.transpose(l_t, 0, 1)
-        print(l_t.shape)
-        return h_t, cell_state, l_t
+        return lstm_out, h_t, cell_state

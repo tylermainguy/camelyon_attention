@@ -1,4 +1,7 @@
 import torch
+import torch.nn.functional as F
+
+from visualize_glimpse import visualize_glimpse
 
 
 class GlimpseSensor:
@@ -12,7 +15,7 @@ class GlimpseSensor:
 
         self.glimpse_size = glimpse_size
 
-    def glimpse(self, image, location):
+    def glimpse(self, images, location):
         """
         Function that returns the glimpse of the sensor at a given location.
         For now, this will just be the single image itself. In future iterations,
@@ -20,16 +23,32 @@ class GlimpseSensor:
         """
         dist = self.glimpse_size // 2
 
-        location = self.convert_location(location, image.shape[2])
+        # get total number of images in batch
+        batches = images.shape[0]
 
-        print(location)
-        x = location[0].int()
-        y = location[1].int()
+        # get the image size to be used to convert the coordinates
+        location = self.convert_location(location, images.shape[2])
 
-        patch = image[:, :, x - dist: x + dist,
-                      y - dist: y + dist]
+        patches = []
+        for i in range(batches):
+            x = location[i, 0].int()
+            y = location[i, 1].int()
 
-        return patch
+            current_img = images[i, :, :, :]
+
+            padded_img = F.pad(current_img, (dist, dist, dist, dist))
+            x_start = x + dist
+            y_start = y + dist
+
+            # print("LOCATION: ({}, {})".format(x_start, y_start))
+            patch = padded_img[:, x_start - dist: x_start + dist,
+                               y_start - dist: y_start + dist]
+
+            # visualize_glimpse(padded_img, (x_start, y_start), patch)
+            patches.append(patch)
+
+        patches = torch.stack(patches, dim=0)
+        return patches
 
     def convert_location(self, location, image_size):
         """

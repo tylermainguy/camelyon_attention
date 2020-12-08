@@ -91,32 +91,33 @@ def main():
         # open the given slide
         slide = open_slide(str(file_path))
 
-        # get bounding box around the tissue sample
-        coords = get_bounding_box(slide, DOWNSAMPLE_FACTOR)
+        print(slide.dimensions)
+        # # get bounding box around the tissue sample
+        # coords = get_bounding_box(slide, DOWNSAMPLE_FACTOR)
 
-        # get downsampled version of slide
-        downsampled = downsample(slide, DOWNSAMPLE_FACTOR)
+        # # get downsampled version of slide
+        # downsampled = downsample(slide, DOWNSAMPLE_FACTOR)
 
-        # crop downsampled slide around bounding box
-        cropped = downsampled.crop(coords)
+        # # crop downsampled slide around bounding box
+        # cropped = downsampled.crop(coords)
 
-        if not os.path.exists(final_save_path):
-            os.makedirs(final_save_path)
+        # if not os.path.exists(final_save_path):
+        #     os.makedirs(final_save_path)
 
-        x, y = cropped.size
+        # x, y = cropped.size
 
-        print("Image size: {}".format(cropped.size))
-        if x > max_x:
-            max_x = x
+        # print("Image size: {}".format(cropped.size))
+        # if x > max_x:
+        #     max_x = x
 
-        if y > max_y:
-            max_y = y
+        # if y > max_y:
+        #     max_y = y
         # don't want to just crop. need to get some consistent "largest size",
         # and determine from there what the size of the images should be
         # print("Image shape: {}".format(cropped.size))
         # # maybe combine this with the crop
-        # cropped = cropped.resize((2000, 2000))
-        cropped.save(final_save)
+        # cropped = cropped.resize((5000, 5000))
+        # cropped.save(final_save)
 
     print("Max width: {}".format(max_x))
     print("Max height: {}".format(max_y))
