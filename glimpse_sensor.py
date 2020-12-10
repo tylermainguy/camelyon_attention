@@ -44,8 +44,9 @@ class GlimpseSensor:
             patch = padded_img[:, x_start - dist: x_start + dist,
                                y_start - dist: y_start + dist]
 
-            # visualize_glimpse(padded_img, (x_start, y_start), patch)
-            patches.append(patch)
+            if (i == 0):
+                visualize_glimpse(padded_img, (x_start, y_start), patch)
+                patches.append(patch)
 
         patches = torch.stack(patches, dim=0)
         return patches

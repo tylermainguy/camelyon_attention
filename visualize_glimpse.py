@@ -14,7 +14,7 @@ def visualize_glimpse(image, location, glimpse):
     ax0.imshow(image.cpu().numpy())
 
     ax1.imshow(image.cpu().numpy())
-    ax1.plot(location[0].int().cpu(), location[1].int().cpu(), "ro")
+    ax1.plot(location[1].int().cpu(), location[0].int().cpu(), "ro")
 
     ax2.imshow(glimpse.cpu().numpy())
 

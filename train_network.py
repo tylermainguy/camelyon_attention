@@ -6,13 +6,34 @@ from torch.utils.tensorboard import SummaryWriter
 
 from recurrent_attention import RecurrentAttentionModel
 
+# https://github.com/pytorch/examples/blob/master/imagenet/main.py
+
+
+class AverageMeter:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
 
 def train(train_loader, model, writer, epoch):
     """
     Train the neural network on batches of data.
     """
+    losses = AverageMeter()
+    accuracy = AverageMeter()
 
-    num_glimpses = 3
+    num_glimpses = 5
 
     # need to confirm these values
     std = 0.05
@@ -25,12 +46,10 @@ def train(train_loader, model, writer, epoch):
     # use gpu
     device = torch.device("cuda")
 
-    loss_sum = 0
     # use adam optimizer for network
     optimizer = optim.Adam(model.parameters())
 
     for i, (x, y) in enumerate(train_loader):
-        print("BATCH #{}".format(i))
         batch_size = x.shape[0]
         # sample initial location from uniform distribution
         l_t = torch.FloatTensor(batch_size, 2).uniform_(-1, 1).to(device)
@@ -113,28 +132,27 @@ def train(train_loader, model, writer, epoch):
         acc = torch.sum((round_prediction.detach() ==
                          y).float()) / reward.shape[0] * 100
 
+        losses.update(loss, batch_size)
+        accuracy.update(acc, batch_size)
+
         # backprop
         loss.backward()
         optimizer.step()
 
-        loss_sum += loss.item()
+        iteration = epoch * len(train_loader) + i
 
-        if i % 5 == 0:
-            loss_val = loss_sum / 5
-            print("LOSS: {}".format(loss_val))
-            writer.add_scalar("Loss/train", loss_val,
-                              epoch * len(train_loader) + i)
-
-            loss_sum = 0
-        # print("CURRENT LOSS: {}\t CURRENT ACCURACY: {}%".format(loss.item(), acc))
-
+        writer.add_scalar("Loss/train", losses.avg, iteration)
+        writer.add_scalar("Accuracy/train", accuracy.avg, iteration)
     return model
 
 
 @ torch.no_grad()
 def validate_model(val_loader, model, num_valid, writer, epoch):
 
-    num_glimpses = 3
+    losses = AverageMeter()
+    accuracy = AverageMeter()
+
+    num_glimpses = 5
 
     std = 0.05
     glimpse_size = 512
@@ -173,17 +191,64 @@ def validate_model(val_loader, model, num_valid, writer, epoch):
             device=device,
             requires_grad=True
         )
+
+        locations = []
+        log_pis = []
+        baselines = []
+
+        # run the model for a fixed number of glimpses
         for j in range(num_glimpses - 1):
-            h_t, cell_state, l_t, log_pi, _ = model(
+            h_t, cell_state, l_t, log_pi, baseline = model(
                 x, l_t, h_t, cell_state, False)
 
-        _, _, _, _, _, prediction = model(
+            locations.append(l_t)
+            log_pis.append(log_pi)
+            baselines.append(baseline)
+
+        # final round of model gives prediction
+        h_t, cell_state, l_t, log_pi, baseline, prediction = model(
             x, l_t, h_t, cell_state, is_pred=True)
 
+        locations.append(l_t)
+        log_pis.append(log_pi)
+        baselines.append(baseline)
+
+        # reinforcement learning term
+        log_pis = torch.stack(log_pis).transpose(1, 0)
+        baselines = torch.stack(baselines).transpose(1, 0)
+
+        # get predictions for batch
         prediction = torch.squeeze(prediction, dim=1)
         round_prediction = torch.round(prediction)
 
-        correct += torch.sum((round_prediction.detach() == y).float())
+        # model reward based on correct classification
+        reward = (round_prediction.detach() == y).float()
 
-    acc = correct / num_valid
-    print("VALIDATION ACC: {}".format(acc * 100))
+        # want the reward to be repeated for several timesteps
+        reward = reward.unsqueeze(1).repeat(1, num_glimpses)
+
+        # compute the action loss
+        action_loss = F.binary_cross_entropy(prediction, y.float())
+        baseline_loss = F.mse_loss(baselines, reward)
+
+        # adjust reward using baseline (reduce variance)
+        adjust_reward = reward - baselines.detach()
+
+        # REINFORCE algo
+        reinforce_loss = torch.sum(-log_pis * adjust_reward, dim=1)
+        reinforce_loss = torch.mean(reinforce_loss, dim=0)
+
+        # dynamic loss
+        loss = action_loss + baseline_loss + reinforce_loss * 0.01
+
+        # get the accuracy for this batch
+        acc = torch.sum((round_prediction.detach() ==
+                         y).float()) / reward.shape[0] * 100
+
+        losses.update(loss, batch_size)
+        accuracy.update(acc, batch_size)
+
+        iteration = epoch * len(val_loader) + i
+
+        writer.add_scalar("Loss/validation", losses.avg, iteration)
+        writer.add_scalar("Accuracy/validation", accuracy.avg, iteration)
