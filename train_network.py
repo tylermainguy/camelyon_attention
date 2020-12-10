@@ -4,6 +4,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
+from matplotlib import pyplot as plt
 from recurrent_attention import RecurrentAttentionModel
 
 # https://github.com/pytorch/examples/blob/master/imagenet/main.py
@@ -36,11 +37,6 @@ def train(train_loader, model, writer, epoch):
     num_glimpses = 5
 
     # need to confirm these values
-    std = 0.05
-    glimpse_size = 512
-    location_hidden_size = 128
-    glimpse_feature_size = 128
-    location_output_size = 2
     hidden_state_size = 256
 
     # use gpu
@@ -50,23 +46,30 @@ def train(train_loader, model, writer, epoch):
     optimizer = optim.Adam(model.parameters())
 
     for i, (x, y) in enumerate(train_loader):
+        print("BATCH {}".format(i))
+        # get batch size
         batch_size = x.shape[0]
+
+        # visualize what the training data looks like
+        # visualize_batch(x, y, batch_size)
+
         # sample initial location from uniform distribution
         l_t = torch.FloatTensor(batch_size, 2).uniform_(-1, 1).to(device)
 
-        # need to add sequence length for LSTM
+        # intialize hidden state for LSTM
         h_t = torch.randn(
-            1,
             batch_size,
+            1,
             hidden_state_size,
             dtype=torch.float,
             device=device,
             requires_grad=True,
         )
 
+        # intialize cell state for LSTM
         cell_state = torch.randn(
-            1,
             batch_size,
+            1,
             hidden_state_size,
             dtype=torch.float,
             device=device,
@@ -76,9 +79,10 @@ def train(train_loader, model, writer, epoch):
         # zero model gradients before starting pass
         optimizer.zero_grad()
 
-        # send to GPU
+        # send data to GPU
         x, y = x.to(device), y.to(device)
 
+        # keep track of locations selected
         locations = []
         log_pis = []
         baselines = []
@@ -100,12 +104,13 @@ def train(train_loader, model, writer, epoch):
         log_pis.append(log_pi)
         baselines.append(baseline)
 
-        # reinforcement learning term
+        # stack list into tensor
         log_pis = torch.stack(log_pis).transpose(1, 0)
         baselines = torch.stack(baselines).transpose(1, 0)
 
         # get predictions for batch
         prediction = torch.squeeze(prediction, dim=1)
+
         round_prediction = torch.round(prediction)
 
         # model reward based on correct classification
@@ -116,6 +121,8 @@ def train(train_loader, model, writer, epoch):
 
         # compute the action loss
         action_loss = F.binary_cross_entropy(prediction, y.float())
+
+        # compute baseline loss for variance reduction
         baseline_loss = F.mse_loss(baselines, reward)
 
         # adjust reward using baseline (reduce variance)
@@ -132,6 +139,7 @@ def train(train_loader, model, writer, epoch):
         acc = torch.sum((round_prediction.detach() ==
                          y).float()) / reward.shape[0] * 100
 
+        # update tracking of loss
         losses.update(loss, batch_size)
         accuracy.update(acc, batch_size)
 
@@ -141,8 +149,10 @@ def train(train_loader, model, writer, epoch):
 
         iteration = epoch * len(train_loader) + i
 
+        # tensorboard logging
         writer.add_scalar("Loss/train", losses.avg, iteration)
         writer.add_scalar("Accuracy/train", accuracy.avg, iteration)
+
     return model
 
 
@@ -154,11 +164,8 @@ def validate_model(val_loader, model, num_valid, writer, epoch):
 
     num_glimpses = 5
 
-    std = 0.05
-    glimpse_size = 512
     location_hidden_size = 128
     glimpse_feature_size = 128
-    location_output_size = 2
     hidden_state_size = 256
     # use gpu
     device = torch.device("cuda")
@@ -175,8 +182,8 @@ def validate_model(val_loader, model, num_valid, writer, epoch):
         l_t = torch.FloatTensor(batch_size, 2).uniform_(-1, 1).to(device)
 
         h_t = torch.randn(
-            1,
             batch_size,
+            1,
             hidden_state_size,
             dtype=torch.float,
             device=device,
@@ -184,8 +191,8 @@ def validate_model(val_loader, model, num_valid, writer, epoch):
         )
 
         cell_state = torch.randn(
-            1,
             batch_size,
+            1,
             hidden_state_size,
             dtype=torch.float,
             device=device,
@@ -252,3 +259,16 @@ def validate_model(val_loader, model, num_valid, writer, epoch):
 
         writer.add_scalar("Loss/validation", losses.avg, iteration)
         writer.add_scalar("Accuracy/validation", accuracy.avg, iteration)
+
+
+def visualize_batch(data, labels, batch_size):
+
+    fig = plt.figure()
+
+    for i in range(1, 4 * 4 + 1):
+        img = data[i - 1, :, :, :]
+        img = img.permute(1, 2, 0)
+        fig.add_subplot(4, 4, i)
+        plt.imshow(img)
+
+    plt.show()

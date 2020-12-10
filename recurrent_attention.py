@@ -43,7 +43,7 @@ class RecurrentAttentionModel(nn.Module):
         lstm_out, h_t, cell_state = self.core_net(h_t_prev, cell_state, g_t)
 
         # remove "len_seq" from lstm_out
-        lstm_out = torch.squeeze(lstm_out, 0)
+        lstm_out = torch.squeeze(lstm_out, 1)
 
         baseline = self.baseline_net(lstm_out).squeeze()
 

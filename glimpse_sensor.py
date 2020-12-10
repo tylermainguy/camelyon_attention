@@ -26,11 +26,12 @@ class GlimpseSensor:
         # get total number of images in batch
         batches = images.shape[0]
 
+        n_locs = location.shape[0]
         # get the image size to be used to convert the coordinates
         location = self.convert_location(location, images.shape[2])
 
         patches = []
-        for i in range(batches):
+        for i in range(n_locs):
             x = location[i, 0].int()
             y = location[i, 1].int()
 
@@ -40,13 +41,12 @@ class GlimpseSensor:
             x_start = x + dist
             y_start = y + dist
 
-            # print("LOCATION: ({}, {})".format(x_start, y_start))
             patch = padded_img[:, x_start - dist: x_start + dist,
                                y_start - dist: y_start + dist]
 
-            if (i == 0):
-                visualize_glimpse(padded_img, (x_start, y_start), patch)
-                patches.append(patch)
+            # if (i == 0):
+            #     visualize_glimpse(padded_img, (x_start, y_start), patch)
+            patches.append(patch)
 
         patches = torch.stack(patches, dim=0)
         return patches

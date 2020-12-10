@@ -37,4 +37,6 @@ class LocationNetwork(nn.Module):
         # bound between [-1, 1]
         l_t = torch.clamp(l_t, -1, 1)
 
+        l_t = torch.squeeze(l_t, 1)
+
         return log_pi, l_t
