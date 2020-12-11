@@ -17,11 +17,11 @@ class RecurrentAttentionModel(nn.Module):
     feature extraction from glimpses.
     """
 
-    def __init__(self, glimpse_size, location_hidden_size, glimpse_feature_size, hidden_state_size, location_output_size, std):
+    def __init__(self, glimpse_size, location_hidden_size, glimpse_feature_size, hidden_state_size, location_output_size, std, glimpse_hidden, channels, num_patches, zoom_amt):
         super().__init__()
 
         self.glimpse_net = GlimpseNetwork(
-            glimpse_size, location_hidden_size, glimpse_feature_size)
+            glimpse_size, location_hidden_size, glimpse_feature_size, glimpse_hidden, channels, num_patches, zoom_amt)
 
         self.core_net = CoreNetwork(
             glimpse_feature_size, hidden_state_size, location_output_size)
@@ -33,14 +33,14 @@ class RecurrentAttentionModel(nn.Module):
         self.baseline_net = BaselineNetwork(hidden_state_size, 1)
         # params here
 
-    def forward(self, image, location, h_t_prev, cell_state, is_pred=False):
+    def forward(self, image, location, is_pred=False):
         """
         Forward pass, combining these units together.
         """
 
         g_t = self.glimpse_net(image, location)
 
-        lstm_out, h_t, cell_state = self.core_net(h_t_prev, cell_state, g_t)
+        lstm_out = self.core_net(g_t)
 
         # remove "len_seq" from lstm_out
         lstm_out = torch.squeeze(lstm_out, 1)
@@ -52,6 +52,6 @@ class RecurrentAttentionModel(nn.Module):
         # only want to produce classification on last iteration
         if is_pred:
             prediction = self.classification_net(lstm_out)
-            return h_t, cell_state, l_t, log_pi, baseline, prediction
+            return l_t, log_pi, baseline, prediction
 
-        return h_t, cell_state, l_t, log_pi, baseline
+        return l_t, log_pi, baseline

@@ -26,7 +26,7 @@ class CoreNetwork(nn.Module):
         self.lstm = nn.LSTM(glimpse_feature_size,
                             hidden_state_size, batch_first=True)
 
-    def forward(self, h_t_prev, cell_state, glimpse_feature):
+    def forward(self, glimpse_feature):
         """
         forward pass of the recurrent unit. output is the updated hidden
         state of the hidden unit
@@ -36,7 +36,7 @@ class CoreNetwork(nn.Module):
 
         self.lstm.flatten_parameters()
         # pass in new feature and previous hidden state into LSTM
-        lstm_out, (h_t, cell_state) = self.lstm(
+        lstm_out, _ = self.lstm(
             glimpse_feature)
 
-        return lstm_out, h_t, cell_state
+        return lstm_out

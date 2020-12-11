@@ -15,21 +15,29 @@ class GlimpseNetwork(nn.Module):
     to be used to updated the hidden state.
     """
 
-    def __init__(self, glimpse_size, location_hidden_size, glimpse_feature_size):
+    def __init__(self, glimpse_size, location_hidden_size, glimpse_feature_size, glimpse_hidden, channels, num_patches, zoom_amt):
         super().__init__()
 
         self.glimpse_size = glimpse_size
         self.location_hidden_size = location_hidden_size
+        self.glimpse_hidden = glimpse_hidden
+        self.channels = channels
+        self.num_patches = num_patches
 
-        self.sensor = GlimpseSensor(glimpse_size)
+        self.sensor = GlimpseSensor(
+            glimpse_size, num_zooms=num_patches, zoom_amt=zoom_amt)
 
         # input to the location network is always size 2
         self.location_fc1 = nn.Linear(2, location_hidden_size)
 
-        self.inception = get_pretrained_inception(glimpse_feature_size)
+        in_dim = channels * num_patches * glimpse_size * glimpse_size
+        # self.inception = get_pretrained_inception(glimpse_feature_size)
+        self.glimpse1 = nn.Linear(in_dim, glimpse_hidden)
 
         self.location_fc2 = nn.Linear(
             location_hidden_size, glimpse_feature_size)
+
+        self.glimpse2 = nn.Linear(glimpse_hidden, glimpse_feature_size)
 
     def forward(self, image, location):
 
@@ -39,7 +47,8 @@ class GlimpseNetwork(nn.Module):
         l_out = self.location_fc2(l_hidden)
 
         # this should be replaced with CNN code
-        glimpse_out = self.inception(glimpse)
+        glimpse = F.relu(self.glimpse1(glimpse))
+        glimpse_out = self.glimpse2(glimpse)
 
         # TODO combine the output of the location and conv. layers
         glimpse_feature = F.relu(l_out + glimpse_out)

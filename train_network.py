@@ -7,10 +7,14 @@ from torch.utils.tensorboard import SummaryWriter
 from matplotlib import pyplot as plt
 from recurrent_attention import RecurrentAttentionModel
 
-# https://github.com/pytorch/examples/blob/master/imagenet/main.py
-
 
 class AverageMeter:
+    """
+    Tracking of average values used for loss and accuracy monitoring.
+    Code taken from:
+    https://github.com/pytorch/examples/blob/master/imagenet/main.py
+    """
+
     def __init__(self):
         self.reset()
 
@@ -27,117 +31,111 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
 
-def train(train_loader, model, writer, epoch):
+def compute_metrics(log_pis, baselines, prediction, label, params):
     """
-    Train the neural network on batches of data.
+    Compute the loss function for the model.
     """
-    losses = AverageMeter()
-    accuracy = AverageMeter()
 
-    num_glimpses = 5
+    # get predictions for batch
+    prediction = torch.squeeze(prediction, dim=1)
 
-    # need to confirm these values
-    hidden_state_size = 256
+    # round sigmoid val to 1 or 0
+    round_prediction = torch.round(prediction)
 
-    # use gpu
-    device = torch.device("cuda")
+    # model reward based on correct classification
+    reward = (round_prediction.detach() == label).float()
 
-    # use adam optimizer for network
-    optimizer = optim.Adam(model.parameters())
+    # want the reward to be repeated for several timesteps
+    reward = reward.unsqueeze(1).repeat(1, params["num_glimpses"])
 
-    for i, (x, y) in enumerate(train_loader):
-        print("BATCH {}".format(i))
-        # get batch size
-        batch_size = x.shape[0]
+    # compute the action loss
+    action_loss = F.binary_cross_entropy(prediction, label.float())
 
-        # visualize what the training data looks like
-        # visualize_batch(x, y, batch_size)
+    # compute baseline loss for variance reduction
+    baseline_loss = F.mse_loss(baselines, reward)
 
-        # sample initial location from uniform distribution
-        l_t = torch.FloatTensor(batch_size, 2).uniform_(-1, 1).to(device)
+    # adjust reward using baseline (reduce variance)
+    adjust_reward = reward - baselines.detach()
 
-        # intialize hidden state for LSTM
-        h_t = torch.randn(
-            batch_size,
-            1,
-            hidden_state_size,
-            dtype=torch.float,
-            device=device,
-            requires_grad=True,
-        )
+    # REINFORCE algo
+    reinforce_loss = torch.sum(-log_pis * adjust_reward, dim=1)
+    reinforce_loss = torch.mean(reinforce_loss, dim=0)
 
-        # intialize cell state for LSTM
-        cell_state = torch.randn(
-            batch_size,
-            1,
-            hidden_state_size,
-            dtype=torch.float,
-            device=device,
-            requires_grad=True
-        )
+    # dynamic loss
+    loss = action_loss + baseline_loss + reinforce_loss * 0.01
 
-        # zero model gradients before starting pass
-        optimizer.zero_grad()
+    # get the accuracy for this batch
+    acc = torch.sum((round_prediction.detach() ==
+                     label).float()) / reward.shape[0] * 100
 
-        # send data to GPU
-        x, y = x.to(device), y.to(device)
+    return loss, acc
 
-        # keep track of locations selected
-        locations = []
-        log_pis = []
-        baselines = []
 
-        # run the model for a fixed number of glimpses
-        for j in range(num_glimpses - 1):
-            h_t, cell_state, l_t, log_pi, baseline = model(
-                x, l_t, h_t, cell_state, False)
+def run_batch(model, x, y, params):
+    # get batch size
+    batch_size = x.shape[0]
 
-            locations.append(l_t)
-            log_pis.append(log_pi)
-            baselines.append(baseline)
+    # visualize what the training data looks like
+    # visualize_batch(x, y, batch_size)
 
-        # final round of model gives prediction
-        h_t, cell_state, l_t, log_pi, baseline, prediction = model(
-            x, l_t, h_t, cell_state, is_pred=True)
+    # sample initial location from uniform distribution
+    l_t = torch.FloatTensor(
+        batch_size, 2).uniform_(-1, 1).to(params["device"])
+
+    # send data to GPU
+    x, y = x.to(params["device"]), y.to(params["device"])
+
+    # keep track of locations selected
+    locations = []
+    log_pis = []
+    baselines = []
+
+    # run the model for a fixed number of glimpses
+    for j in range(params["num_glimpses"] - 1):
+        l_t, log_pi, baseline = model(x, l_t, False)
 
         locations.append(l_t)
         log_pis.append(log_pi)
         baselines.append(baseline)
 
-        # stack list into tensor
-        log_pis = torch.stack(log_pis).transpose(1, 0)
-        baselines = torch.stack(baselines).transpose(1, 0)
+    # final round of model gives prediction
+    l_t, log_pi, baseline, prediction = model(
+        x, l_t, is_pred=True)
 
-        # get predictions for batch
-        prediction = torch.squeeze(prediction, dim=1)
+    locations.append(l_t)
+    log_pis.append(log_pi)
+    baselines.append(baseline)
 
-        round_prediction = torch.round(prediction)
+    # stack lists into tensor
+    log_pis = torch.stack(log_pis).transpose(1, 0)
+    baselines = torch.stack(baselines).transpose(1, 0)
 
-        # model reward based on correct classification
-        reward = (round_prediction.detach() == y).float()
+    return locations, log_pis, baselines, prediction
 
-        # want the reward to be repeated for several timesteps
-        reward = reward.unsqueeze(1).repeat(1, num_glimpses)
 
-        # compute the action loss
-        action_loss = F.binary_cross_entropy(prediction, y.float())
+def train(train_loader, model, writer, epoch, params):
+    """
+    Train the neural network on batches of data.
+    """
 
-        # compute baseline loss for variance reduction
-        baseline_loss = F.mse_loss(baselines, reward)
+    # put model in train mode
+    model.train()
 
-        # adjust reward using baseline (reduce variance)
-        adjust_reward = reward - baselines.detach()
+    # for monitoring loss and accuracy
+    losses = AverageMeter()
+    accuracy = AverageMeter()
 
-        # REINFORCE algo
-        reinforce_loss = torch.sum(-log_pis * adjust_reward, dim=1)
-        reinforce_loss = torch.mean(reinforce_loss, dim=0)
+    # use adam optimizer for network
+    optimizer = optim.Adam(model.parameters())
 
-        # dynamic loss
-        loss = action_loss + baseline_loss + reinforce_loss * 0.01
+    for i, (x, y) in enumerate(train_loader):
+        batch_size = x.shape[0]
 
-        # get the accuracy for this batch
-        acc = torch.sum((round_prediction.detach() ==
-                         y).float()) / reward.shape[0] * 100
+        optimizer.zero_grad()
+        locations, log_pis, baselines, prediction = run_batch(
+            model, x, y, params)
+
+        loss, acc = compute_metrics(log_pis, baselines, prediction, y, params)
 
         # update tracking of loss
         losses.update(loss, batch_size)
@@ -157,100 +155,21 @@ def train(train_loader, model, writer, epoch):
 
 
 @ torch.no_grad()
-def validate_model(val_loader, model, num_valid, writer, epoch):
+def validate_model(val_loader, model, num_valid, writer, epoch, params):
+
+    # put model in evaluation mode
+    model.eval()
 
     losses = AverageMeter()
     accuracy = AverageMeter()
 
-    num_glimpses = 5
-
-    location_hidden_size = 128
-    glimpse_feature_size = 128
-    hidden_state_size = 256
-    # use gpu
-    device = torch.device("cuda")
-
-    correct = 0
-    total = 0
-
     for i, (x, y) in enumerate(val_loader):
         batch_size = x.shape[0]
-        # send to GPU
-        x, y = x.to(device), y.to(device)
 
-       # sample initial location from uniform distribution
-        l_t = torch.FloatTensor(batch_size, 2).uniform_(-1, 1).to(device)
+        locations, log_pis, baselines, prediction = run_batch(
+            model, x, y, params)
 
-        h_t = torch.randn(
-            batch_size,
-            1,
-            hidden_state_size,
-            dtype=torch.float,
-            device=device,
-            requires_grad=True,
-        )
-
-        cell_state = torch.randn(
-            batch_size,
-            1,
-            hidden_state_size,
-            dtype=torch.float,
-            device=device,
-            requires_grad=True
-        )
-
-        locations = []
-        log_pis = []
-        baselines = []
-
-        # run the model for a fixed number of glimpses
-        for j in range(num_glimpses - 1):
-            h_t, cell_state, l_t, log_pi, baseline = model(
-                x, l_t, h_t, cell_state, False)
-
-            locations.append(l_t)
-            log_pis.append(log_pi)
-            baselines.append(baseline)
-
-        # final round of model gives prediction
-        h_t, cell_state, l_t, log_pi, baseline, prediction = model(
-            x, l_t, h_t, cell_state, is_pred=True)
-
-        locations.append(l_t)
-        log_pis.append(log_pi)
-        baselines.append(baseline)
-
-        # reinforcement learning term
-        log_pis = torch.stack(log_pis).transpose(1, 0)
-        baselines = torch.stack(baselines).transpose(1, 0)
-
-        # get predictions for batch
-        prediction = torch.squeeze(prediction, dim=1)
-        round_prediction = torch.round(prediction)
-
-        # model reward based on correct classification
-        reward = (round_prediction.detach() == y).float()
-
-        # want the reward to be repeated for several timesteps
-        reward = reward.unsqueeze(1).repeat(1, num_glimpses)
-
-        # compute the action loss
-        action_loss = F.binary_cross_entropy(prediction, y.float())
-        baseline_loss = F.mse_loss(baselines, reward)
-
-        # adjust reward using baseline (reduce variance)
-        adjust_reward = reward - baselines.detach()
-
-        # REINFORCE algo
-        reinforce_loss = torch.sum(-log_pis * adjust_reward, dim=1)
-        reinforce_loss = torch.mean(reinforce_loss, dim=0)
-
-        # dynamic loss
-        loss = action_loss + baseline_loss + reinforce_loss * 0.01
-
-        # get the accuracy for this batch
-        acc = torch.sum((round_prediction.detach() ==
-                         y).float()) / reward.shape[0] * 100
+        loss, acc = compute_metrics(log_pis, baselines, prediction, y, params)
 
         losses.update(loss, batch_size)
         accuracy.update(acc, batch_size)

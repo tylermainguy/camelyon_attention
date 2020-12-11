@@ -10,10 +10,12 @@ class GlimpseSensor:
     for generating "glimpses" of a given region from an image.
     """
 
-    def __init__(self, glimpse_size):
+    def __init__(self, glimpse_size, num_zooms, zoom_amt):
         super().__init__()
 
         self.glimpse_size = glimpse_size
+        self.num_zooms = num_zooms
+        self.zoom_amt = zoom_amt
 
     def glimpse(self, images, location):
         """
@@ -31,25 +33,59 @@ class GlimpseSensor:
         location = self.convert_location(location, images.shape[2])
 
         patches = []
-        for i in range(n_locs):
+
+        factor = 1
+
+        # get zoom levels for each patch in the batch
+        #   poet, and I didn't even know it
+
+        for i in range(self.num_zooms):
+            patch = self.get_zoomed_patch(images, location, factor)
+            patches.append(patch)
+            factor = factor * self.zoom_amt
+
+        for i in range(len(patches)):
+            zoom_factor = patches[i].shape[-1] // self.glimpse_size
+            patches[i] = F.avg_pool2d(patches[i], zoom_factor)
+
+        patches = torch.cat(patches, 1)
+        patches = patches.view(patches.shape[0], -1)
+        # if (i == 0):
+        #     visualize_glimpse(padded_img, (x_start, y_start), patch)
+
+        return patches
+
+    def get_zoomed_patch(self, img, location, factor):
+        """
+        Gets the patch for a given image at a location l, with scaling size.
+        """
+
+        total_size = self.glimpse_size * factor
+
+        dist = total_size // 2
+
+        img = F.pad(img, (dist, dist, dist, dist))
+
+        patches = []
+        # over each image in the batch
+        for i in range(location.shape[0]):
+            # get coordinates of glimpse
             x = location[i, 0].int()
             y = location[i, 1].int()
 
-            current_img = images[i, :, :, :]
-
-            padded_img = F.pad(current_img, (dist, dist, dist, dist))
+            # middle location + padding
             x_start = x + dist
             y_start = y + dist
 
-            patch = padded_img[:, x_start - dist: x_start + dist,
-                               y_start - dist: y_start + dist]
+            # extract the patch
+            patch = img[i, :, x_start - dist: x_start + dist,
+                        y_start - dist: y_start + dist]
 
-            # if (i == 0):
-            #     visualize_glimpse(padded_img, (x_start, y_start), patch)
+            # add the patch to the current set
             patches.append(patch)
 
-        patches = torch.stack(patches, dim=0)
-        return patches
+        # return list of patches as a tensor
+        return torch.stack(patches)
 
     def convert_location(self, location, image_size):
         """

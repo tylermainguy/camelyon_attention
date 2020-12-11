@@ -14,10 +14,41 @@ from recurrent_attention import RecurrentAttentionModel
 from torch.utils.tensorboard import SummaryWriter
 
 
-def main():
+def get_params():
+    """
+    Set the parameters for various aspects of the program.
+    """
 
-    # for tensorboard logging
-    writer = SummaryWriter()
+    params = {}
+
+    params["test"] = False
+    params["batch_size"] = 16
+    params["num_epochs"] = 100
+    params["glimpse_size"] = 128
+    params["std"] = 0.05
+
+    params["validation_perc"] = 0.1
+    # size["parameters
+    params["location_hidden_size"] = 128
+    params["glimpse_feature_size"] = 128
+    params["glimpse_hidden"] = 128
+    params["num_patches"] = 3
+    params["zoom_amt"] = 2
+    params["location_output_size"] = 2
+    params["hidden_state_size"] = 256
+    params["channels"] = 3
+    params["num_glimpses"] = 10
+    params["device"] = torch.device("cuda")
+
+    return params
+
+
+def get_dataset(params):
+    """
+    Prepare dataset for use by the model. Performs several different data
+    augmentation tasks; random rotation, random flipping, and random cropping.
+    The images are then split into train and validation sets.
+    """
 
     # data augmentation and preprocessing
     transf = transforms.Compose([
@@ -34,89 +65,111 @@ def main():
     dataset = datasets.ImageFolder("data/train/downsampled", transform=transf)
 
     # 10% validation set
-    validation_perc = 0.1
     num_train = len(dataset)
     indices = list(range(num_train))
-    split = int(np.floor(validation_perc * num_train))
+    split = int(np.floor(params["validation_perc"] * num_train))
 
+    # randomize selection of train/val
     np.random.seed(13)
     np.random.shuffle(indices)
 
+    # get train/val indices
     train_idx, valid_idx = indices[split:], indices[:split]
 
     # train/val split
     train_sampler = SubsetRandomSampler(train_idx)
     val_sampler = SubsetRandomSampler(valid_idx)
 
-    # select batch size
-    batch_size = 16
-    num_epochs = 200
-
     # prepare train dataset loader
     train_loader = torch.utils.data.DataLoader(
         dataset=dataset,
-        batch_size=batch_size,
+        batch_size=params["batch_size"],
         sampler=train_sampler,
-        drop_last=True
     )
 
     # prepare validation set loader
     val_loader = torch.utils.data.DataLoader(
         dataset=dataset,
-        batch_size=batch_size,
+        batch_size=params["batch_size"],
         sampler=val_sampler,
-        drop_last=True
     )
 
-    # size of glimpse image
-    glimpse_size = 224
+    return train_loader, val_loader
 
-    # standard deviation for location sampling
-    std = 0.05
 
-    # size parameters
-    location_hidden_size = 128
-    glimpse_feature_size = 128
-    location_output_size = 2
-    hidden_state_size = 256
+def get_model(params):
+    """
+    Get the model. Can either instantiate an instance of the model based
+    on parameters given, or load a previously trained model from memory.
+    """
+
+    # load previous model
+    if params["load_model"] and os.path.exists("checkpoints/2020-12-11.pth"):
+        model = torch.load("checkpoints/2020-12-11.pth")
 
     # create model
-    model = RecurrentAttentionModel(
-        glimpse_size=glimpse_size,
-        location_hidden_size=location_hidden_size,
-        glimpse_feature_size=glimpse_feature_size,
-        location_output_size=location_output_size,
-        hidden_state_size=hidden_state_size,
-        std=std
-    )
+    else:
+        model = RecurrentAttentionModel(
+            glimpse_size=params["glimpse_size"],
+            location_hidden_size=params["location_hidden_size"],
 
-    if os
-    model.load_state_dict(torch.load("checkpoints/2020-12-10"))
+            glimpse_feature_size=params["glimpse_feature_size"],
+            location_output_size=params["location_output_size"],
+            hidden_state_size=params["hidden_state_size"],
+            std=params["std"],
+            glimpse_hidden=params["glimpse_hidden"],
+            channels=params["channels"],
+            num_patches=params["num_patches"],
+            zoom_amt=params["zoom_amt"]
+        )
+
+    return model
+
+
+def main():
+    """
+    Main program for training and validating the recurrent attention model (RAM)
+    applied to the problem of WSI classification.
+    """
+    # get params for this run
+    params = get_params()
+
+    # for tensorboard logging
+    writer = SummaryWriter()
+
+    # get train and validation datasets
+    train_loader, val_loader = get_dataset(params)
+
+    # get model
+    model = get_model(params)
+
     # count number of training and validation samples
     num_train = len(train_loader.sampler.indices)
     num_valid = len(val_loader.sampler.indices)
 
-    # use gpu
-    device = torch.device("cuda")
-
+    # use all gpus
     model = nn.DataParallel(model, dim=0)
-    # send model to gpu
-    model.to(device)
+    model.to(params["device"])
 
-    # run for a given number of epochs
-    for epoch in range(num_epochs):
+    # iterate over epochs
+    for epoch in range(params["num_epochs"]):
 
         start = time.time()
         print("EPOCH {}".format(epoch))
-        # train model
-        model = train(train_loader, model, writer, epoch)
+        model = train(train_loader, model, writer, epoch, params)
 
         end = time.time()
         print("\t...completed in {} seconds".format(end - start))
         # validate
-        validate_model(val_loader, model, num_valid, writer, epoch)
+        validate_model(val_loader, model, num_valid, writer, epoch, params)
 
-    print("DONE!!!")
+    # save model after training completes
+    torch.save(model, "checkpoints/2020-12-11.pth")
+
+    # TODO if we're running model on test set
+    if params["test"]:
+        # test_model(test_loader, model, writer)
+        print("testing")
 
 
 if __name__ == "__main__":
