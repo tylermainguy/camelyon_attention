@@ -1,17 +1,17 @@
-import torch
+import numpy as np
 import os
 import time
-from torchvision import datasets, transforms
-from matplotlib import pyplot as plt
-import numpy as np
+import torch
 import torch.nn as nn
-from torch.utils.data.sampler import SubsetRandomSampler
 
-from glimpse_sensor import GlimpseSensor
-from inception_pretrained import get_pretrained_inception
-from train_network import train, validate_model
-from recurrent_attention import RecurrentAttentionModel
+from matplotlib import pyplot as plt
+from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
+from torchvision import datasets, transforms
+
+from inception_pretrained import get_pretrained_inception
+from recurrent_attention import RecurrentAttentionModel
+from train_network import train, validate_model
 
 
 def get_params():
@@ -21,10 +21,11 @@ def get_params():
 
     params = {}
 
+    params["load_model"] = False
     params["test"] = False
     params["batch_size"] = 16
     params["num_epochs"] = 100
-    params["glimpse_size"] = 128
+    params["glimpse_size"] = 224
     params["std"] = 0.05
 
     params["validation_perc"] = 0.1
@@ -32,7 +33,7 @@ def get_params():
     params["location_hidden_size"] = 128
     params["glimpse_feature_size"] = 128
     params["glimpse_hidden"] = 128
-    params["num_patches"] = 3
+    params["num_patches"] = 5
     params["zoom_amt"] = 2
     params["location_output_size"] = 2
     params["hidden_state_size"] = 256
@@ -53,9 +54,6 @@ def get_dataset(params):
     # data augmentation and preprocessing
     transf = transforms.Compose([
         transforms.RandomRotation((0, 360)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.RandomResizedCrop(3196),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
                              0.229, 0.224, 0.225])
@@ -85,6 +83,7 @@ def get_dataset(params):
         dataset=dataset,
         batch_size=params["batch_size"],
         sampler=train_sampler,
+        drop_last=True
     )
 
     # prepare validation set loader
@@ -92,6 +91,7 @@ def get_dataset(params):
         dataset=dataset,
         batch_size=params["batch_size"],
         sampler=val_sampler,
+        drop_last=True
     )
 
     return train_loader, val_loader

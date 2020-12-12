@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from glimpse_network import GlimpseNetwork
-from core_network import CoreNetwork
-from classification_network import ClassificationNetwork
-from location_network import LocationNetwork
 from baseline_network import BaselineNetwork
+from classification_network import ClassificationNetwork
+from core_network import CoreNetwork
+from glimpse_network import GlimpseNetwork
+from location_network import LocationNetwork
 
 
 class RecurrentAttentionModel(nn.Module):

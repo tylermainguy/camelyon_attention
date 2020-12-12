@@ -1,16 +1,17 @@
 import cv2
-import os
 import math
-import numpy
-import pandas as pd
 import numpy as np
-from skimage.filters import threshold_otsu
-from matplotlib import pyplot as plt
-from openslide import open_slide, ImageSlide
-from PIL import Image, ImageOps
-from pathlib import Path
+import os
+import pandas as pd
 import time
 
+from matplotlib import pyplot as plt
+from openslide import open_slide
+from pathlib import Path
+from PIL import Image, ImageOps
+from skimage.filters import threshold_otsu
+
+# prevent decompression bomb error
 Image.MAX_IMAGE_PIXELS = None
 
 
@@ -20,12 +21,12 @@ def get_bounding_box(slide, downsample_factor):
     as histology samples are typically in the range of gigabytes.
     """
 
-    # get thumbnail of image (we can downsample here for thresholding)
+    # get downsampled image for thresholding
     thumbnail = slide.get_thumbnail(
         (slide.dimensions[0] / 256, slide.dimensions[1] / 256))
     thum = np.array(thumbnail)
 
-    # convert image to hsv for otsu thresholding
+    # otsu threshold HSV channels
     hsv_image = cv2.cvtColor(thum, cv2.COLOR_BGR2HSV)
     h, s, v = cv2.split(hsv_image)
     hthresh = threshold_otsu(h)
@@ -59,6 +60,7 @@ def get_bounding_box(slide, downsample_factor):
     bboxt = math.floor(np.min(xxmin)*256), math.floor(np.min(yymin) *
                                                       256), math.floor(np.max(xxmax)*256), math.floor(np.max(yymax)*256)
 
+    # get coordinates scaled for the downsampled image
     return list(map(lambda x: x // downsample_factor, list(bboxt)))
 
 
@@ -74,73 +76,57 @@ def downsample(slide, downsample_factor):
 
 def main():
     """
-    Main function for segmenting images.
+    Segmenting WSI data. Takes samples, finds bounding box around the tissue
+    within the sample and crops. Image is then zero-padded to the largest
+    cropped image size, and scaled to a constant size. 
     """
 
+    # downsample factor for original image
     DOWNSAMPLE_FACTOR = 4
+
+    # hardcoded - largest image size after cropping for 4x downsampling
     IM_SIZE = 12784 // DOWNSAMPLE_FACTOR
 
+    # paths
     data_path = Path("data/train/original")
     save_path = Path("data/train/downsampled/")
 
-    max_x = 0
-    max_y = 0
-
-    x_sizes = []
-    y_sizes = []
-
-    num = 0
+    # for each input image
     for file_path in data_path.rglob("*.tif"):
-        print("IMAGE {}".format(num))
-        if (num > 200):
-            start = time.time()
-            # get filename, create savepath
-            filename = "/".join(str(file_path).split("/")[-2:])
-            final_save = save_path / filename
-            final_save_path = "/".join(str(final_save).split("/")[:-1])
 
-            # open the given slide
-            slide = open_slide(str(file_path))
-            print("\tDimensions: {}".format(slide.dimensions))
+        start = time.time()
 
-            # # get bounding box around the tissue sample
-            coords = get_bounding_box(slide, DOWNSAMPLE_FACTOR)
+        # get filename, create savepath
+        filename = "/".join(str(file_path).split("/")[-2:])
+        final_save = save_path / filename
+        final_save_path = "/".join(str(final_save).split("/")[:-1])
 
-            x_size = coords[2] - coords[0]
-            y_size = coords[3] - coords[1]
+        # open the given slide
+        slide = open_slide(str(file_path))
+        print("\tDimensions: {}".format(slide.dimensions))
 
-            # # get downsampled version of slide
-            downsampled = downsample(slide, DOWNSAMPLE_FACTOR)
+        # get bounding box around the tissue sample
+        coords = get_bounding_box(slide, DOWNSAMPLE_FACTOR)
 
-            # # crop downsampled slide around bounding box
-            cropped = downsampled.crop(coords)
-            downsampled.close()
-            padded = ImageOps.pad(cropped, (IM_SIZE, IM_SIZE))
-            cropped.close()
-            end = time.time()
-            print("\tTime to process: {}".format(end - start))
-            # if not os.path.exists(final_save_path):
-            #     os.makedirs(final_save_path)
+        x_size = coords[2] - coords[0]
+        y_size = coords[3] - coords[1]
 
-            # x, y = cropped.size
+        # get downsampled version of slide
+        downsampled = downsample(slide, DOWNSAMPLE_FACTOR)
 
-            # print("Image size: {}".format(cropped.size))
-            # if x_size > max_x:
-            #     max_x = x_size
+        # crop downsampled slide around bounding box
+        cropped = downsampled.crop(coords)
+        downsampled.close()
+        padded = ImageOps.pad(cropped, (IM_SIZE, IM_SIZE))
+        cropped.close()
+        end = time.time()
 
-            # if y_size > max_y:
-            #     max_y = y_size
+        # how long to process a sample
+        print("\tTime to process: {}".format(end - start))
 
-            padded.save(final_save)
-            padded.close()
-
-        num += 1
-
-    # print("Max width: {}".format(max_x))
-    # print("Max height: {}".format(max_y))
-
-    print("MAX X SIZE: {}".format(max_x))
-    print("MAX Y SIZE: {}".format(max_y))
+        # save the padded image
+        padded.save(final_save)
+        padded.close()
 
 
 if __name__ == "__main__":

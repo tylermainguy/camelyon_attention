@@ -1,9 +1,9 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import numpy as np
+import torch
+import torch.optim as optim
+import torch.nn as nn
+
 from torchvision import datasets, models, transforms
-import torchvision
 
 
 def get_pretrained_inception(out_size):
