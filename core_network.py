@@ -23,20 +23,24 @@ class CoreNetwork(nn.Module):
         self.input_size = glimpse_feature_size
 
         # lstm network
-        self.lstm = nn.LSTM(glimpse_feature_size,
-                            hidden_state_size, batch_first=True)
+        self.i2h = nn.Linear(glimpse_feature_size, hidden_state_size)
+        self.h2h = nn.Linear(hidden_state_size, hidden_state_size)
+        # self.lstm = nn.LSTM(glimpse_feature_size,
+        # hidden_state_size, batch_first=True)
 
-    def forward(self, glimpse_feature):
+    def forward(self, glimpse_feature, h_t_prev):
         """
         forward pass of the recurrent unit. output is the updated hidden
         state of the hidden unit
         """
         # need to add number of timesteps per input (only one timestep)
-        glimpse_feature = glimpse_feature.unsqueeze(1)
+        # glimpse_feature = glimpse_feature.unsqueeze(1)
 
-        self.lstm.flatten_parameters()
         # pass in new feature and previous hidden state into LSTM
-        lstm_out, _ = self.lstm(
-            glimpse_feature)
+        # lstm_out, _ = self.lstm(
+        #     glimpse_feature)
+        layer1 = self.i2h(glimpse_feature)
+        layer2 = self.h2h(h_t_prev)
 
+        lstm_out = F.relu(layer1 + layer2)
         return lstm_out

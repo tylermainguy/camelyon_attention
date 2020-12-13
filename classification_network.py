@@ -15,13 +15,10 @@ class ClassificationNetwork(nn.Module):
 
         super().__init__()
 
-        self.fc1 = nn.Linear(hidden_size, 1)
-        self.sig = nn.Sigmoid()
+        self.fc1 = nn.Linear(hidden_size, 2)
 
     def forward(self, h_t):
 
-        rough_pred = self.sig(self.fc1(h_t))
-        # TODO CAREFUL HERE - not sure if doing this changes anything
-        rough_pred = torch.squeeze(rough_pred, 0)
+        rough_pred = F.log_softmax(self.fc1(h_t), dim=1)
 
         return rough_pred

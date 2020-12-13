@@ -13,7 +13,6 @@ def get_pretrained_inception(out_size):
     # load in the pretrained model
     model = models.mobilenet_v2(pretrained=True)
 
-    print(model.classifier[1])
     # only want to train the last few layers
     for param in model.parameters():
         param.requires_grad = False

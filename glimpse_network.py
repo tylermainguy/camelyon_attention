@@ -43,6 +43,7 @@ class GlimpseNetwork(nn.Module):
 
         glimpse = self.sensor.glimpse(image, location)
 
+        location = location.view(location.size(0), -1)
         l_hidden = F.relu(self.location_fc1(location))
         l_out = self.location_fc2(l_hidden)
 

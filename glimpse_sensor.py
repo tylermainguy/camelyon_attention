@@ -98,4 +98,4 @@ class GlimpseSensor:
         loc_2 = (1 + location) * image_size
 
         # return values in range [0, image_size]
-        return loc_2 * 0.5
+        return (loc_2 * 0.5).long()

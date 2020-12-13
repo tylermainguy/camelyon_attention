@@ -33,25 +33,25 @@ class RecurrentAttentionModel(nn.Module):
         self.baseline_net = BaselineNetwork(hidden_state_size, 1)
         # params here
 
-    def forward(self, image, location, is_pred=False):
+    def forward(self, image, location, h_t_prev, is_pred=False):
         """
         Forward pass, combining these units together.
         """
 
         g_t = self.glimpse_net(image, location)
+        print("GLIMPSE SIZE: {}".format(g_t.shape))
+        h_t = self.core_net(g_t, h_t_prev)
+        print("CORE NET SHAPE: {}".format(h_t.shape))
+        # # remove "len_seq" from lstm_out
+        # h_t = torch.squeeze(h_t_prev, 1)
 
-        lstm_out = self.core_net(g_t)
+        baseline = self.baseline_net(h_t).squeeze()
 
-        # remove "len_seq" from lstm_out
-        lstm_out = torch.squeeze(lstm_out, 1)
-
-        baseline = self.baseline_net(lstm_out).squeeze()
-
-        log_pi, l_t = self.location_net(lstm_out)
+        log_pi, l_t = self.location_net(h_t)
 
         # only want to produce classification on last iteration
         if is_pred:
-            prediction = self.classification_net(lstm_out)
-            return l_t, log_pi, baseline, prediction
+            prediction = self.classification_net(h_t)
+            return l_t, h_t, log_pi, baseline, prediction
 
-        return l_t, log_pi, baseline
+        return l_t, h_t, log_pi, baseline

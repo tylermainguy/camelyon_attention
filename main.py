@@ -2,6 +2,7 @@ import numpy as np
 import os
 import time
 import torch
+import torch.optim as optim
 import torch.nn as nn
 
 from matplotlib import pyplot as plt
@@ -25,20 +26,20 @@ def get_params():
     params["test"] = False
     params["batch_size"] = 16
     params["num_epochs"] = 100
-    params["glimpse_size"] = 224
+    params["glimpse_size"] = 32
     params["std"] = 0.05
 
     params["validation_perc"] = 0.1
     # size["parameters
     params["location_hidden_size"] = 128
-    params["glimpse_feature_size"] = 128
+    params["glimpse_feature_size"] = 256
     params["glimpse_hidden"] = 128
     params["num_patches"] = 5
     params["zoom_amt"] = 2
     params["location_output_size"] = 2
     params["hidden_state_size"] = 256
     params["channels"] = 3
-    params["num_glimpses"] = 10
+    params["num_glimpses"] = 5
     params["device"] = torch.device("cuda")
 
     return params
@@ -55,8 +56,9 @@ def get_dataset(params):
     transf = transforms.Compose([
         transforms.RandomRotation((0, 360)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
-                             0.229, 0.224, 0.225])
+        transforms.Normalize((0.1307,), (0.3081,))
+        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
+        #  0.229, 0.224, 0.225])
     ])
 
     # load dataset
@@ -72,7 +74,7 @@ def get_dataset(params):
     np.random.shuffle(indices)
 
     # get train/val indices
-    train_idx, valid_idx = indices[split:], indices[:split]
+    train_idx, valid_idx = indices[split:], indices[: split]
 
     # train/val split
     train_sampler = SubsetRandomSampler(train_idx)
@@ -143,20 +145,27 @@ def main():
     # get model
     model = get_model(params)
 
+    print(model)
     # count number of training and validation samples
     num_train = len(train_loader.sampler.indices)
     num_valid = len(val_loader.sampler.indices)
 
     # use all gpus
-    model = nn.DataParallel(model, dim=0)
+    # model = nn.DataParallel(model, dim=0)
     model.to(params["device"])
+
+    # for p in model.parameters():
+    #     p.register_hook(lambda grad: torch.clamp(
+    #         grad, -1, 1))
+    # use adam optimizer for network
+    optimizer = optim.Adam(model.parameters())
 
     # iterate over epochs
     for epoch in range(params["num_epochs"]):
 
         start = time.time()
         print("EPOCH {}".format(epoch))
-        model = train(train_loader, model, writer, epoch, params)
+        train(train_loader, model, writer, epoch, params, optimizer)
 
         end = time.time()
         print("\t...completed in {} seconds".format(end - start))
