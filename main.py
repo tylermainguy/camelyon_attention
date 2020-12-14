@@ -116,7 +116,6 @@ def get_model(params):
         model = RecurrentAttentionModel(
             glimpse_size=params["glimpse_size"],
             location_hidden_size=params["location_hidden_size"],
-
             glimpse_feature_size=params["glimpse_feature_size"],
             location_output_size=params["location_output_size"],
             hidden_state_size=params["hidden_state_size"],

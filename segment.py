@@ -82,14 +82,19 @@ def main():
     """
 
     # downsample factor for original image
-    DOWNSAMPLE_FACTOR = 4
+    DOWNSAMPLE_FACTOR = 8
 
     # hardcoded - largest image size after cropping for 4x downsampling
-    IM_SIZE = 12784 // DOWNSAMPLE_FACTOR
+    x_size = 52096 // DOWNSAMPLE_FACTOR
+    y_size = 51136 // DOWNSAMPLE_FACTOR
+    # IM_SIZE = (52096, 51136) // DOWNSAMPLE_FACTOR
 
     # paths
-    data_path = Path("data/train/original")
-    save_path = Path("data/train/downsampled/")
+    data_path = Path("data/train/original/tumor/")
+    save_path = Path("data/train/downsampled_2/")
+
+    max_x = 0
+    max_y = 0
 
     # for each input image
     for file_path in data_path.rglob("*.tif"):
@@ -109,29 +114,37 @@ def main():
         coords = get_bounding_box(slide, DOWNSAMPLE_FACTOR)
 
         # # image size
-        # x_size = coords[2] - coords[0]
-        # y_size = coords[3] - coords[1]
+        x_size = coords[2] - coords[0]
+        y_size = coords[3] - coords[1]
+
+        if x_size > max_x:
+            max_x = x_size
+
+        if y_size > max_y:
+            max_y = y_size
 
         # get downsampled version of slide
         downsampled = downsample(slide, DOWNSAMPLE_FACTOR)
-
+        print("OUCH")
         # crop downsampled slide around bounding box
         cropped = downsampled.crop(coords)
         downsampled.close()
 
         # pad image to consistent size
-        padded = ImageOps.pad(cropped, (IM_SIZE, IM_SIZE))
+        padded = ImageOps.pad(cropped, (x_size, y_size))
         cropped.close()
 
         # how long to process a sample
         end = time.time()
         print("\tTime to process: {}".format(end - start))
 
-        # resized = padded.resize(5000, 5000)
-        # padded.close
-        # save the padded image
-        padded.save(final_save)
-        # resized.close()
+        resized = padded.resize((4000, 4000))
+        padded.close
+        # # save the padded image
+        resized.save(final_save)
+        resized.close()
+
+    print("Max size: ({}, {})".format(max_x, max_y))
 
 
 if __name__ == "__main__":
