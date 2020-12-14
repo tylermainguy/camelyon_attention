@@ -85,12 +85,12 @@ def main():
     DOWNSAMPLE_FACTOR = 8
 
     # hardcoded - largest image size after cropping for 4x downsampling
-    x_size = 52096 // DOWNSAMPLE_FACTOR
-    y_size = 51136 // DOWNSAMPLE_FACTOR
+    x_size = 26048
+    y_size = 25568
     # IM_SIZE = (52096, 51136) // DOWNSAMPLE_FACTOR
 
     # paths
-    data_path = Path("data/train/original/tumor/")
+    data_path = Path("data/train/original/")
     save_path = Path("data/train/downsampled_2/")
 
     max_x = 0
