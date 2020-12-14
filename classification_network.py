@@ -15,10 +15,12 @@ class ClassificationNetwork(nn.Module):
 
         super().__init__()
 
+        # binary prediction
         self.fc1 = nn.Linear(hidden_size, 2)
 
     def forward(self, h_t):
 
-        rough_pred = F.log_softmax(self.fc1(h_t), dim=1)
+        # get log probabilities
+        probabilities = F.log_softmax(self.fc1(h_t), dim=1)
 
-        return rough_pred
+        return probabilities

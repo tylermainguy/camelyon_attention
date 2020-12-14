@@ -23,33 +23,33 @@ class GlimpseSensor:
         For now, this will just be the single image itself. In future iterations,
         it will support several zoom levels.
         """
+        visualize = False
+
         dist = self.glimpse_size // 2
 
-        # get total number of images in batch
-        batches = images.shape[0]
-
-        n_locs = location.shape[0]
         # get the image size to be used to convert the coordinates
         location = self.convert_location(location, images.shape[2])
 
+        # factor to "zoom out" images
+        factor = 1
         patches = []
 
-        factor = 1
-
-        # get zoom levels for each patch in the batch
-        #   poet, and I didn't even know it
-
+        # generate patches for each zoom level
         for i in range(self.num_zooms):
             patch = self.get_zoomed_patch(images, location, factor)
             patches.append(patch)
             factor = factor * self.zoom_amt
 
+        # reshape zoomed out images to smallest size
         for i in range(len(patches)):
             zoom_factor = patches[i].shape[-1] // self.glimpse_size
             patches[i] = F.avg_pool2d(patches[i], zoom_factor)
 
-        # visualize_glimpse(patches, images, location)
+        if visualize:
+            # to visualize given glimpses
+            visualize_glimpse(patches, images, location)
 
+        # concatenate into tensor, and flatten
         patches = torch.cat(patches, 1)
         patches = patches.view(patches.shape[0], -1)
 
@@ -60,10 +60,12 @@ class GlimpseSensor:
         Gets the patch for a given image at a location l, with scaling size.
         """
 
+        # total image size scaled by factor of zoom
         total_size = self.glimpse_size * factor
 
         dist = total_size // 2
 
+        # pad image so there's no bad indexing
         img = F.pad(img, (dist, dist, dist, dist))
 
         patches = []
@@ -73,7 +75,7 @@ class GlimpseSensor:
             x = location[i, 0].int()
             y = location[i, 1].int()
 
-            # middle location + padding
+            # factor padding into initial location
             x_start = x + dist
             y_start = y + dist
 

@@ -22,8 +22,10 @@ def get_params():
 
     params = {}
 
+    params["multi_gpu"] = False
     params["load_model"] = False
     params["test"] = False
+    params["visualize_batch"] = False
     params["batch_size"] = 16
     params["num_epochs"] = 500
     params["glimpse_size"] = 64
@@ -56,9 +58,7 @@ def get_dataset(params):
     transf = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        # transforms.RandomRotation((0, 360)),
         transforms.ToTensor(),
-        # transforms.Normalize((0.1307,), (0.3081,))
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
             0.229, 0.224, 0.225])
     ])
@@ -147,16 +147,10 @@ def main():
     # get model
     model = get_model(params)
 
-    print(model)
-    # count number of training and validation samples
-    num_train = len(train_loader.sampler.indices)
-    num_valid = len(val_loader.sampler.indices)
-
-    # use all gpus
-    # model = nn.DataParallel(model, dim=0)
+    if params["multi_gpu"]:
+        model = nn.DataParallel(model, dim=0)
     model.to(params["device"])
 
-    # use adam optimizer for network
     optimizer = optim.Adam(model.parameters(), lr=3e-4)
 
     # iterate over epochs
@@ -169,10 +163,10 @@ def main():
         end = time.time()
         print("\t...completed in {} seconds".format(end - start))
         # validate
-        validate_model(val_loader, model, num_valid, writer, epoch, params)
+        validate_model(val_loader, model, writer, epoch, params)
 
     # save model after training completes
-    torch.save(model, "checkpoints/2020-12-11.pth")
+    torch.save(model, "checkpoints/2020-12-14.pth")
 
     # TODO if we're running model on test set
     if params["test"]:

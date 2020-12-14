@@ -6,7 +6,8 @@ import torch.nn.functional as F
 class BaselineNetwork(nn.Module):
     """
     Used for baseline adjustment in the REINFORCE algorithm. Reduces the
-    variance in the approximation of the variance.
+    variance in the approximation of the gradient
+    (see https://arxiv.org/abs/1406.6247).
     """
 
     def __init__(self, input_size, output_size):

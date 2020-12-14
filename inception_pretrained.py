@@ -11,7 +11,7 @@ def get_pretrained_inception(out_size):
     Function to get a pretrained inception network ready for use in our network.
     """
     # load in the pretrained model
-    model = models.mobilenet_v2(pretrained=True)
+    model = models.inception_v3(pretrained=True)
 
     # only want to train the last few layers
     for param in model.parameters():

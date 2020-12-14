@@ -15,10 +15,7 @@ def compute_metrics(log_pis, baselines, probabs, label, params):
     Compute the loss function for the model.
     """
 
-    # # get predictions for batch
-    # prediction = torch.squeeze(prediction, dim=1)
-
-    # round sigmoid val to 1 or 0
+    # get max from softmax
     predicted = torch.max(probabs, 1)[1]
 
     # model reward based on correct classification
@@ -51,9 +48,13 @@ def compute_metrics(log_pis, baselines, probabs, label, params):
 
 
 def run_batch(model, x, y, params):
-    # get batch size
+    """
+    Function to run a single batch of data through the model.
+    """
+
     batch_size = x.shape[0]
 
+    # initialize the LSTM hidden state
     h_t_init = torch.zeros(
         1,
         params["batch_size"],
@@ -63,6 +64,7 @@ def run_batch(model, x, y, params):
         requires_grad=True,
     )
 
+    # initialize the LSTM cell state
     cell_init = torch.zeros(
         1,
         params["batch_size"],
@@ -72,15 +74,20 @@ def run_batch(model, x, y, params):
         requires_grad=True,
     )
 
+    # LSTM init state
     h_t = (h_t_init, cell_init)
-    # visualize what the training data looks like
-    # visualize_batch(x, y, batch_size)
+
+    # check data before feeding into model
+    if params["visualize_batch"]:
+        visualize_batch(x, y, batch_size)
 
     # sample initial location from uniform distribution
+    # (-1, 1) is how RAM indexes locations
     l_t = torch.FloatTensor(
         batch_size, 2).uniform_(-1, 1).to(params["device"])
     l_t.requires_grad = True
-    # keep track of locations selected
+
+    # values for REINFORCE algo
     locations = []
     log_pis = []
     baselines = []
@@ -119,43 +126,62 @@ def train(train_loader, model, writer, epoch, params, optimizer):
     losses = AverageMeter()
     accuracy = AverageMeter()
 
-    for i, (x, y) in enumerate(train_loader):  # send data to GPU
-        x, y = x.to(params["device"]), y.to(params["device"])
-        batch_size = x.shape[0]
+    # iterate over batches
+    for i, (x, y) in enumerate(train_loader):
 
+        # zero gradients accumulated so far
         optimizer.zero_grad()
+
+        # send data to GPU
+        x, y = x.to(params["device"]), y.to(params["device"])
+
         locations, log_pis, baselines, prediction = run_batch(
             model, x, y, params)
 
         # compute loss and accuracy
         loss, acc = compute_metrics(log_pis, baselines, prediction, y, params)
 
+        batch_size = x.shape[0]
+
         # update tracking of loss
         losses.update(loss.item(), batch_size)
         accuracy.update(acc.item(), batch_size)
 
         print("\nLOSS: ", loss.item())
+
         # backprop
         loss.backward()
+
+        # gradient clipping to prevent LSTM exploding gradients
         torch.nn.utils.clip_grad_value_(model.parameters(), 1)
-        for p in model.parameters():
-            print("\tGRAD: {}".format(p.grad.norm()))
-        # plot_grad_flow(model.named_parameters())
+
+        # check model for exploding gradients
+        if params["check_gradient"]:
+            for p in model.parameters():
+                print("\tGRAD: {}".format(p.grad.norm()))
+
+            plot_grad_flow(model.named_parameters())
+
+        # run ADAM
         optimizer.step()
 
-        # tensorboard logging
-        iteration = epoch * len(train_loader) + i
-
+    # log epoch to tensorboard
     writer.add_scalar("Loss/train", losses.avg, epoch)
     writer.add_scalar("Accuracy/train", accuracy.avg, epoch)
 
 
 def plot_grad_flow(named_parameters):
-    '''Plots the gradients flowing through different layers in the net during training.
+    """ 
+    Code to visualize gradient from https://discuss.pytorch.org/t/check-gradient-flow-in-network/15063
+
+    Plots the gradients flowing through different layers in the net during training.
     Can be used for checking for possible gradient vanishing / exploding problems.
 
     Usage: Plug this function in Trainer class after loss.backwards() as
-    "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
+    "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow
+
+    """
+
     ave_grads = []
     max_grads = []
     layers = []
@@ -182,16 +208,21 @@ def plot_grad_flow(named_parameters):
 
 
 @ torch.no_grad()
-def validate_model(val_loader, model, num_valid, writer, epoch, params):
+def validate_model(val_loader, model, writer, epoch, params):
 
     # put model in evaluation mode
     model.eval()
 
+    # track losses
     losses = AverageMeter()
     accuracy = AverageMeter()
 
+    # iterate over batch
     for i, (x, y) in enumerate(val_loader):
+
+        # send data to GPU
         x, y = x.to(params["device"]), y.to(params["device"])
+
         batch_size = x.shape[0]
 
         locations, log_pis, baselines, prediction = run_batch(
@@ -202,17 +233,18 @@ def validate_model(val_loader, model, num_valid, writer, epoch, params):
         losses.update(loss, batch_size)
         accuracy.update(acc, batch_size)
 
-        iteration = epoch * len(val_loader) + i
-
     writer.add_scalar("Loss/validation", losses.avg, epoch)
     writer.add_scalar("Accuracy/validation", accuracy.avg, epoch)
 
 
 def visualize_batch(data, labels, batch_size):
-
+    """
+    Visualize data in a given batch. Good for verifying the quality of the 
+    data before passing into the model.
+    """
     fig = plt.figure()
 
-    for i in range(1, 4 * 4 + 1):
+    for i in range(1, batch_size * batch_size + 1):
         img = data[i - 1, :, :, :]
         img = img.permute(1, 2, 0)
         fig.add_subplot(4, 4, i)

@@ -82,14 +82,14 @@ def main():
     """
 
     # downsample factor for original image
-    DOWNSAMPLE_FACTOR = 2
+    DOWNSAMPLE_FACTOR = 4
 
     # hardcoded - largest image size after cropping for 4x downsampling
-    IM_SIZE = 25568 // DOWNSAMPLE_FACTOR
+    IM_SIZE = 12784 // DOWNSAMPLE_FACTOR
 
     # paths
     data_path = Path("data/train/original")
-    save_path = Path("data/train/downsampled_2/")
+    save_path = Path("data/train/downsampled/")
 
     # for each input image
     for file_path in data_path.rglob("*.tif"):
@@ -108,8 +108,9 @@ def main():
         # get bounding box around the tissue sample
         coords = get_bounding_box(slide, DOWNSAMPLE_FACTOR)
 
-        x_size = coords[2] - coords[0]
-        y_size = coords[3] - coords[1]
+        # # image size
+        # x_size = coords[2] - coords[0]
+        # y_size = coords[3] - coords[1]
 
         # get downsampled version of slide
         downsampled = downsample(slide, DOWNSAMPLE_FACTOR)
@@ -117,18 +118,20 @@ def main():
         # crop downsampled slide around bounding box
         cropped = downsampled.crop(coords)
         downsampled.close()
+
+        # pad image to consistent size
         padded = ImageOps.pad(cropped, (IM_SIZE, IM_SIZE))
         cropped.close()
-        end = time.time()
 
         # how long to process a sample
+        end = time.time()
         print("\tTime to process: {}".format(end - start))
 
-        resized = padded.resize(5000, 5000)
-        padded.close
+        # resized = padded.resize(5000, 5000)
+        # padded.close
         # save the padded image
-        resized.save(final_save)
-        resized.close()
+        padded.save(final_save)
+        # resized.close()
 
 
 if __name__ == "__main__":
