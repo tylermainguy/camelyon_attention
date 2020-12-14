@@ -12,7 +12,7 @@ The dataset is publicly available on the [CAMELYON-16 grand challenge site](http
 To download dependencies required to run this code, run
 
 ```bash
-conda env create camelyon.yml
+conda env create -f camelyon.yml
 ```
 
 If using the dataset downloaded from the CAMELYON-16 site, data preprocessing is required before running the model. To do this, run
