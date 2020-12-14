@@ -48,11 +48,10 @@ class GlimpseSensor:
             zoom_factor = patches[i].shape[-1] // self.glimpse_size
             patches[i] = F.avg_pool2d(patches[i], zoom_factor)
 
-        # visualize_glimpse(patches, location)
+        # visualize_glimpse(patches, images, location)
 
         patches = torch.cat(patches, 1)
         patches = patches.view(patches.shape[0], -1)
-        # if (i == 0):
 
         return patches
 

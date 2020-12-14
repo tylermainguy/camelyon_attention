@@ -25,22 +25,22 @@ def get_params():
     params["load_model"] = False
     params["test"] = False
     params["batch_size"] = 16
-    params["num_epochs"] = 100
-    params["glimpse_size"] = 32
-    params["std"] = 0.05
+    params["num_epochs"] = 500
+    params["glimpse_size"] = 64
+    params["std"] = 0.1
 
     params["validation_perc"] = 0.1
     # size["parameters
     params["location_hidden_size"] = 128
     params["glimpse_feature_size"] = 256
     params["glimpse_hidden"] = 128
-    params["num_patches"] = 5
+    params["num_patches"] = 3
     params["zoom_amt"] = 2
     params["location_output_size"] = 2
     params["hidden_state_size"] = 256
     params["channels"] = 3
     params["num_glimpses"] = 5
-    params["device"] = torch.device("cuda")
+    params["device"] = torch.device("cuda:2")
 
     return params
 
@@ -54,11 +54,13 @@ def get_dataset(params):
 
     # data augmentation and preprocessing
     transf = transforms.Compose([
-        transforms.RandomRotation((0, 360)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        # transforms.RandomRotation((0, 360)),
         transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
-        #  0.229, 0.224, 0.225])
+        # transforms.Normalize((0.1307,), (0.3081,))
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
+            0.229, 0.224, 0.225])
     ])
 
     # load dataset
@@ -70,7 +72,7 @@ def get_dataset(params):
     split = int(np.floor(params["validation_perc"] * num_train))
 
     # randomize selection of train/val
-    np.random.seed(13)
+    np.random.seed(1)
     np.random.shuffle(indices)
 
     # get train/val indices
@@ -154,11 +156,8 @@ def main():
     # model = nn.DataParallel(model, dim=0)
     model.to(params["device"])
 
-    # for p in model.parameters():
-    #     p.register_hook(lambda grad: torch.clamp(
-    #         grad, -1, 1))
     # use adam optimizer for network
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=3e-4)
 
     # iterate over epochs
     for epoch in range(params["num_epochs"]):

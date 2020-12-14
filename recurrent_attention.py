@@ -39,19 +39,17 @@ class RecurrentAttentionModel(nn.Module):
         """
 
         g_t = self.glimpse_net(image, location)
-        print("GLIMPSE SIZE: {}".format(g_t.shape))
-        h_t = self.core_net(g_t, h_t_prev)
-        print("CORE NET SHAPE: {}".format(h_t.shape))
+        lstm_out, h_t = self.core_net(g_t, h_t_prev)
         # # remove "len_seq" from lstm_out
         # h_t = torch.squeeze(h_t_prev, 1)
 
-        baseline = self.baseline_net(h_t).squeeze()
+        baseline = self.baseline_net(lstm_out).squeeze()
 
-        log_pi, l_t = self.location_net(h_t)
+        log_pi, l_t = self.location_net(lstm_out)
 
         # only want to produce classification on last iteration
         if is_pred:
-            prediction = self.classification_net(h_t)
+            prediction = self.classification_net(lstm_out)
             return l_t, h_t, log_pi, baseline, prediction
 
         return l_t, h_t, log_pi, baseline

@@ -16,5 +16,4 @@ class BaselineNetwork(nn.Module):
 
     def forward(self, h_t):
         b_t = self.fc1(h_t.detach())
-        print("BASELINE PUSH: {}".format(b_t.shape))
         return b_t

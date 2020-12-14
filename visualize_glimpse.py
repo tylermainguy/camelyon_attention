@@ -4,7 +4,7 @@ import cv2
 from matplotlib import pyplot as plt
 
 
-def visualize_glimpse(image, location):
+def visualize_glimpse(image, orig, location):
 
     first_set = image[0]
     second_set = image[1]
@@ -18,13 +18,17 @@ def visualize_glimpse(image, location):
     im2 = im2.permute(1, 2, 0)
     im3 = im3.permute(1, 2, 0)
 
-    fig, (ax0, ax1, ax2) = plt.subplots(1, 3)
+    orig = orig[0]
+    orig = orig.permute(1, 2, 0)
 
-    ax0.imshow(im1.cpu().numpy())
+    fig, (ax0, ax1, ax2, ax3) = plt.subplots(1, 4)
 
-    ax1.imshow(im2.cpu().numpy())
-    # ax1.plot(location[1].int().cpu(), location[0].int().cpu(), "ro")
+    ax0.imshow(orig.cpu().numpy())
+    ax0.plot(location[0, 1].int().cpu(), location[0, 0].int().cpu(), "go")
+    ax1.imshow(im1.cpu().numpy())
 
-    ax2.imshow(im3.cpu().numpy())
+    ax2.imshow(im2.cpu().numpy())
+
+    ax3.imshow(im3.cpu().numpy())
 
     plt.show()

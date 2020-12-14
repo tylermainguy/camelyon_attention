@@ -54,13 +54,25 @@ def run_batch(model, x, y, params):
     # get batch size
     batch_size = x.shape[0]
 
-    h_t = torch.zeros(
+    h_t_init = torch.zeros(
+        1,
         params["batch_size"],
         params["hidden_state_size"],
         dtype=torch.float,
         device=params["device"],
         requires_grad=True,
     )
+
+    cell_init = torch.zeros(
+        1,
+        params["batch_size"],
+        params["hidden_state_size"],
+        dtype=torch.float,
+        device=params["device"],
+        requires_grad=True,
+    )
+
+    h_t = (h_t_init, cell_init)
     # visualize what the training data looks like
     # visualize_batch(x, y, batch_size)
 
@@ -108,7 +120,6 @@ def train(train_loader, model, writer, epoch, params, optimizer):
     accuracy = AverageMeter()
 
     for i, (x, y) in enumerate(train_loader):  # send data to GPU
-        print(torch.isnan(x))
         x, y = x.to(params["device"]), y.to(params["device"])
         batch_size = x.shape[0]
 
@@ -123,19 +134,20 @@ def train(train_loader, model, writer, epoch, params, optimizer):
         losses.update(loss.item(), batch_size)
         accuracy.update(acc.item(), batch_size)
 
-        print("LOSS: ", loss.item())
+        print("\nLOSS: ", loss.item())
         # backprop
         loss.backward()
         torch.nn.utils.clip_grad_value_(model.parameters(), 1)
         for p in model.parameters():
-            print("GRAD: {}".format(p.grad.norm()))
+            print("\tGRAD: {}".format(p.grad.norm()))
         # plot_grad_flow(model.named_parameters())
         optimizer.step()
 
         # tensorboard logging
         iteration = epoch * len(train_loader) + i
-        writer.add_scalar("Loss/train", losses.avg, iteration)
-        writer.add_scalar("Accuracy/train", accuracy.avg, iteration)
+
+    writer.add_scalar("Loss/train", losses.avg, epoch)
+    writer.add_scalar("Accuracy/train", accuracy.avg, epoch)
 
 
 def plot_grad_flow(named_parameters):
@@ -192,8 +204,8 @@ def validate_model(val_loader, model, num_valid, writer, epoch, params):
 
         iteration = epoch * len(val_loader) + i
 
-        writer.add_scalar("Loss/validation", losses.avg, iteration)
-        writer.add_scalar("Accuracy/validation", accuracy.avg, iteration)
+    writer.add_scalar("Loss/validation", losses.avg, epoch)
+    writer.add_scalar("Accuracy/validation", accuracy.avg, epoch)
 
 
 def visualize_batch(data, labels, batch_size):

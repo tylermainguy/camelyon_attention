@@ -82,14 +82,14 @@ def main():
     """
 
     # downsample factor for original image
-    DOWNSAMPLE_FACTOR = 4
+    DOWNSAMPLE_FACTOR = 2
 
     # hardcoded - largest image size after cropping for 4x downsampling
-    IM_SIZE = 12784 // DOWNSAMPLE_FACTOR
+    IM_SIZE = 25568 // DOWNSAMPLE_FACTOR
 
     # paths
     data_path = Path("data/train/original")
-    save_path = Path("data/train/downsampled/")
+    save_path = Path("data/train/downsampled_2/")
 
     # for each input image
     for file_path in data_path.rglob("*.tif"):
@@ -124,9 +124,11 @@ def main():
         # how long to process a sample
         print("\tTime to process: {}".format(end - start))
 
+        resized = padded.resize(5000, 5000)
+        padded.close
         # save the padded image
-        padded.save(final_save)
-        padded.close()
+        resized.save(final_save)
+        resized.close()
 
 
 if __name__ == "__main__":
