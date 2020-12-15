@@ -13,6 +13,7 @@ To download dependencies required to run this code, run
 
 ```bash
 conda env create -f camelyon.yml
+conda activate camelyon
 ```
 
 If using the dataset downloaded from the CAMELYON-16 site, data preprocessing is required before running the model. To do this, run
