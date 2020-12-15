@@ -13,9 +13,10 @@ class LocationNetwork(nn.Module):
         super().__init__()
 
         self.hid_size = input_size // 2
+
         self.std = std
         self.fc = nn.Linear(input_size, self.hid_size)
-        self.fc_lt = nn.Linear(hid_size, self.output_size)
+        self.fc_lt = nn.Linear(self.hid_size, output_size)
 
     def forward(self, h_t):
         # compute mean

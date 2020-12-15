@@ -22,11 +22,12 @@ def get_params():
 
     params = {}
 
+    params["check_gradient"] = False
     params["multi_gpu"] = False
     params["load_model"] = False
     params["test"] = False
     params["visualize_batch"] = False
-    params["batch_size"] = 16
+    params["batch_size"] = 8
     params["num_epochs"] = 500
     params["glimpse_size"] = 64
     params["std"] = 0.1
@@ -64,7 +65,8 @@ def get_dataset(params):
     ])
 
     # load dataset
-    dataset = datasets.ImageFolder("data/train/downsampled", transform=transf)
+    dataset = datasets.ImageFolder(
+        "data/train/downsampled_2/", transform=transf)
 
     # 10% validation set
     num_train = len(dataset)

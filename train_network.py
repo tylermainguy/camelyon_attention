@@ -147,8 +147,6 @@ def train(train_loader, model, writer, epoch, params, optimizer):
         losses.update(loss.item(), batch_size)
         accuracy.update(acc.item(), batch_size)
 
-        print("\nLOSS: ", loss.item())
-
         # backprop
         loss.backward()
 
@@ -165,6 +163,7 @@ def train(train_loader, model, writer, epoch, params, optimizer):
         # run ADAM
         optimizer.step()
 
+    print("\nLOSS: ", losses.avg)
     # log epoch to tensorboard
     writer.add_scalar("Loss/train", losses.avg, epoch)
     writer.add_scalar("Accuracy/train", accuracy.avg, epoch)
