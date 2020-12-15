@@ -4,7 +4,7 @@ Final project for CISC 881, applying a recurrent attention model (RAM) to whole-
 
 ## Downloading the data
 
-The dataset is publicly available on the [CAMELYON-16 grand challenge site](https://camelyon16.grand-challenge.org/), where the samples are able to be downloaded.
+The dataset is publicly available on the [CAMELYON-16 grand challenge site](https://camelyon16.grand-challenge.org/), where the samples are able to be downloaded. 
 
 
 ## Running the code
