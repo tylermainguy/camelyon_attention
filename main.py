@@ -66,7 +66,7 @@ def get_dataset(params):
 
     # load dataset
     dataset = datasets.ImageFolder(
-        "data/train/downsampled_2/", transform=transf)
+        "downsampled/", transform=transf)
 
     # 10% validation set
     num_train = len(dataset)
